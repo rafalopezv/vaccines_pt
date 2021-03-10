@@ -1,0 +1,203 @@
+---
+title: 'Progreso de la vacunación'
+author: "Rafa López V"
+output: 
+  html_document: 
+    css: style.css
+---
+
+```{r setup, warnings = FALSE, message = FALSE, include = FALSE}
+knitr::opts_chunk$set(warnings = FALSE, message = FALSE, echo = FALSE)
+
+
+library(tidyverse)
+library(reactable)
+library(sparkline)
+library(htmltools)
+library(htmlwidgets)
+library(magrittr)
+
+source("code/limpieza.R")
+```
+
+<br>
+```{r echo = FALSE}
+### función para la barra de progreso
+
+
+bar_chart <-
+  function(label,
+           width = "100%",
+           height = "16px",
+           fill = "#00bfc4",
+           background = NULL) {
+    bar <-
+      div(style = list(
+        background = fill,
+        width = width,
+        height = height
+      ))
+    chart <-
+      div(style = list(
+        flexGrow = 1,
+        marginLeft = "8px",
+        background = background
+      ),
+      bar)
+    div(style = list(display = "flex", alignItems = "center"), label, chart)
+  }
+
+# funcion de colores 
+make_color_pal <- function(colors, bias = 1) {
+  get_color <- colorRamp(colors, bias = bias)
+  function(x)
+    rgb(get_color(x), maxColorValue = 255)
+}
+
+off_rating_color <-
+  make_color_pal(c("#3ADCC6", "#f8fcf8", "#ef8a62"), bias = 1.3)
+def_rating_color <-
+  make_color_pal(c("#3ADCC6", "#f8fcf8", "#ef8a62"), bias = 0.8)
+
+rating_column <- function(maxWidth = 80, ...) {
+  colDef(
+    maxWidth = maxWidth,
+    align = "center",
+    class = "cell number",
+    headerStyle = list(fontWeight = "500"),
+    ...
+  )
+}
+
+off_rating_color1 <-
+  make_color_pal(rev(c("#3ADCC6", "#f8fcf8", "#ef8a62")), bias = 1.3)
+def_rating_color1 <-
+  make_color_pal(rev(c("#3ADCC6", "#f8fcf8", "#ef8a62")), bias = 0.8)
+
+rating_column1 <- function(maxWidth = 80, ...) {
+  colDef(
+    maxWidth = maxWidth,
+    align = "center",
+    class = "cell number",
+    headerStyle = list(fontWeight = "500"),
+    ...
+  )
+}
+
+
+reactable(
+    temp,
+    pagination = FALSE,
+    showSortIcon = FALSE,
+    highlight = TRUE,
+    compact = TRUE,
+    defaultSorted = "people_vaccinated_per_hundred",
+    defaultSortOrder = "desc",
+    defaultColDef = colDef(headerClass = "header colheader"),
+    columnGroups = list(
+      colGroup(
+        name = "Curva de casos desde el principio de la pandemia [por semana]",
+        columns = c("confirmados", "fallecidos"),
+        headerClass = "groupheader"
+      ),
+      colGroup(
+        name = "Contexto",
+        columns = c("nombre_espanol", "date"),
+        headerClass = "groupheader"
+      ),
+      colGroup(
+        name = "Desempeño de la vacunación",
+        columns = c("people_vaccinated_per_hundred", "ritmo_semanal_una", "tiempo_una_vacuna"),
+        headerClass = "groupheader"
+      )
+    ),
+    columns = list(
+      confirmados = colDef(class = "sparkys",
+                           name = "Infectados",
+                           align = "center",
+                           cell = function(values) {
+    sparkline(values, type = "line", chartRangeMin = 0, height = "80%", width = "70%",
+              fillColor = "#F8F9FA", lineColor = "#073B4C", lineWidth = 3)
+  }),
+  fallecidos = colDef(class = "sparkys",
+                      name = "Falllecidos",
+                      align = "center",
+                      cell = function(values) {
+    sparkline(values, type = "line", chartRangeMin = 0, height = "75%", width = "60%",
+              fillColor = "#F8F9FA", lineColor = "#073B4C", lineWidth = 3)
+  }),
+      
+    people_vaccinated_per_hundred = colDef(
+        class = "cell number border-left",
+        name = "Personas vacunadas [%]",
+        align = "center",
+        headerStyle = list(fontWeight = "400"),
+        cell = function(value) {
+          width <- paste0(value, "%")
+          bar_chart(value,
+                    width = width,
+                    fill = "#E01F52",
+                    background = "#e1e1e1")
+        }
+      ),
+      
+      date = colDef(name = "Actualización de la información", align = "center", 
+                    width = 120, 
+                    class = "division-name cell",
+                    ),
+  tiempo_una_vacuna = rating_column(
+      name = "Semanas hasta concluir vacunación al al ritmo actual",
+      cell = function(value) {
+        normalized <-
+            (value - min(temp$tiempo_una_vacuna)) / (max(temp$tiempo_una_vacuna) - min(temp$tiempo_una_vacuna))
+            
+          
+        color <- off_rating_color(normalized)
+        value <- format(value, nsmall = 0, digits = 0)
+        div(class = "roundcorners",
+            style = list(background = color),
+            value)
+      }
+    ),
+  ritmo_semanal_una = rating_column1(
+      name = "Personas vacunadas la semana pasada [%]",
+      cell = function(value) {
+        normalized <-
+            (value - min(temp$ritmo_semanal_una)) / (max(temp$ritmo_semanal_una) - min(temp$ritmo_semanal_una))
+            
+          
+        color <- off_rating_color1(normalized)
+        value <- format(value, nsmall = 2, digits = 0)
+        div(class = "roundcorners",
+            style = list(background = rev(color)),
+            value)
+      }
+    ),
+  nombre_espanol = colDef(name = "País",
+                          headerStyle = list(align = "center"),
+                          class = "division-name cell")
+    )
+  )
+    
+```
+
+<hr>
+
+Los datos se extraen de [Our World in Data](https://github.com/owid/covid-19-data/blob/master/public/data/README.md) y [Johns Hopkins](https://github.com/CSSEGISandData/COVID-19)
+
+Los cálculos son personales
+
+Inspiración en:
+
+- [Reactable](https://glin.github.io/reactable/)
+- [New York Times](https://www.nytimes.com/interactive/2021/01/25/world/europe/global-vaccination-population-rate.html)
+- [RStudio Table Contest](https://rpubs.com/kcuilla/nfl_team_ratings)
+
+<!-- [Código]() -->
+
+
+
+
+
+
+
