@@ -254,7 +254,7 @@ temp %<>% merge(., nombres, all.x = T)
 temp %<>%
   select(-nombre_espanol) %>% 
   rename(nombre_espanol = nombres_pt) %>% 
-  select(nombre_espanol, everything())
+  select(date, nombre_espanol, everything())
 
 
 

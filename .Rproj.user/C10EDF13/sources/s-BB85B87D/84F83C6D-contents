@@ -21,7 +21,7 @@ source("code/limpieza.R")
 
 <br>
 
-O processo de vacinação não acontece da mesma maneira nas diferentes regiões do mundo. Por que alguns países avançam em grande velocidade no processo enquanto outros países estão apenas começando?  Na Avina, estamos trabalhando para que a vacina seja um bem público universal e esperamos que este seja um espaço de conscientização sobre o tema. As grandes desigualdades nunca são justas, muito menos quando há vidas em jogo. 
+O processo de vacinação não acontece da mesma maneira nas diferentes regiões do mundo. Por que alguns países avançam em grande velocidade no processo enquanto outros países estão apenas começando?  <span style="color: #ED0973;">**Na Avina, estamos trabalhando para que a vacina seja um bem público universal**</span> e esperamos que este seja um espaço de conscientização sobre o tema. As grandes desigualdades nunca são justas, muito menos quando há vidas em jogo. 
 
 A tabela é interativa. Ao clicar sobre o título das colunas, os registros aparecerão em ordem alfabética se forem palavras ou em ordem crescente (e vice-versa) se foram números.   
 
