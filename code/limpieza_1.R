@@ -1,3 +1,4 @@
+
 # sobre: estrructuración de datos para tabla
 # about: data wrangling for table (here onwards code comments are in spanish)
 
@@ -9,81 +10,36 @@ library(janitor)
 # importar bases
 # ---------------------
 
-vacunas <- read_csv("https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/vaccinations/locations.csv")
-vacunas %>% 
-  select(location, iso_code, vaccines) -> vacunas
-  
+
 metricas <- read_csv("https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/vaccinations/vaccinations.csv")
-metricas %>% 
-  filter(location !="European Union") %>% 
-  select(location, iso_code, date, people_vaccinated_per_hundred, people_fully_vaccinated_per_hundred) %>% 
-  left_join(., vacunas) -> metricas
-
-  
-# función people_fully_vaccinated_per_hundred
-limpieza_una <- function(.data) {
-  .data %>% 
-    select(-people_fully_vaccinated_per_hundred) %>% 
-    filter(!is.na(people_vaccinated_per_hundred)) %>% 
-    arrange(desc(date)) %>% 
-  slice(1:7) %>% 
-    mutate(
-      # para al menos una persona vacunada
-      promedio_una_vacuna = lag(people_vaccinated_per_hundred),
-      diferencia_una_vacuna = promedio_una_vacuna -people_vaccinated_per_hundred,
-      diferencia_una_vacuna = mean(diferencia_una_vacuna, na.rm = T),
-      meta_una_vacuna = 100 - people_vaccinated_per_hundred,
-      tiempo_una_vacuna = (meta_una_vacuna/diferencia_una_vacuna)/7,
-      ritmo_semanal_una = diferencia_una_vacuna*7,
-    ) %>% 
-    slice(1) %>% 
-    select(location, iso_code, date, vaccines, people_vaccinated_per_hundred, tiempo_una_vacuna, ritmo_semanal_una) -> temp
-  
-  return(temp)
-}
 
 metricas %>% 
-  group_split(location) -> temp1  
-
-map_dfr(temp1, limpieza_una) -> temp1
-
-
-
-
-limpieza_dos <- function(.data) {
-  .data %>% 
-    select(-people_vaccinated_per_hundred) %>% 
-    filter(!is.na(people_fully_vaccinated_per_hundred)) %>% 
-    arrange(desc(date)) %>% 
-    slice(1:7) %>% 
-    mutate(
-      promedio_dos_vacuna = lag(people_fully_vaccinated_per_hundred),
-      diferencia_dos_vacuna = promedio_dos_vacuna - people_fully_vaccinated_per_hundred,
-      diferencia_dos_vacuna = mean(diferencia_dos_vacuna, na.rm = T),
-      meta_dos_vacuna = 100 - people_fully_vaccinated_per_hundred,
-      tiempo_dos_vacuna = (meta_dos_vacuna/diferencia_dos_vacuna)/7,
-      ritmo_semanal_dos = diferencia_dos_vacuna*7
-    ) %>% 
-    slice(1) %>% 
-    select(location, iso_code, date, vaccines, people_fully_vaccinated_per_hundred, tiempo_dos_vacuna, ritmo_semanal_dos) -> temp
-  
-  return(temp)
-}
-
-metricas %>% 
-  group_split(location) -> temp2  
-
-map_dfr(temp2, limpieza_dos) -> temp2
-
-left_join(temp1, temp2) -> temp
+  filter(
+    location !="European Union",
+    !is.na(people_vaccinated_per_hundred)
+  ) %>% 
+  select(location, iso_code, date, people_vaccinated_per_hundred, 
+         daily_vaccinations_per_million) %>% 
+  group_split(location) %>% 
+  map(., ~arrange(., desc(., date)) %>% 
+        slice(1:7) %>% 
+        mutate(
+          ritmo_semanal_una = daily_vaccinations_per_million/10000,
+          ritmo_semanal_una = mean(ritmo_semanal_una, na.rm = T)*7
+        ) %>% 
+        slice(1)) %>% 
+  bind_rows() %>% 
+  mutate(
+    tiempo_una_vacuna = (100-people_vaccinated_per_hundred)/ritmo_semanal_una
+  ) %>% 
+  select(date, location, everything()) -> metricas
 
 
-# añadir columna con nombres de países en español
 countrycode::codelist %>%
   select(iso_code = iso3c, nombre_espanol = un.name.es) %>% 
-  filter(iso_code %in% (temp$iso_code %>% unique)) %>% 
+  filter(iso_code %in% (metricas$iso_code %>% unique)) %>% 
   janitor::remove_empty() %>% 
-  left_join(temp, .) %>% 
+  left_join(metricas, .) %>% 
   mutate(
     nombre_espanol = case_when(
       location == "World" ~ "Mundo",
@@ -95,13 +51,9 @@ countrycode::codelist %>%
       location == "Gibraltar" ~ "Gibraltar", 
       T  ~ nombre_espanol
     ) 
-  ) -> temp 
-  
-rm(metricas, temp1, temp2, vacunas, limpieza_una, limpieza_dos)
+  ) -> temp
 
-#--------------------------------------------------------
-# añadir columna de curvas de fallecidos y contagiados
-#--------------------------------------------------------
+
 
 url <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv"
 url_m <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv"
@@ -215,9 +167,8 @@ rm(df)
 
 # últimos arreglos 
 temp %>% 
-  select(-iso_code, -location, people_vaccinated_per_hundred, confirmados,
-         fallecidos, -people_fully_vaccinated_per_hundred, -vaccines,
-         tiempo_una_vacuna, ritmo_semanal_una) %>% 
+  select(-iso_code, -location, -daily_vaccinations_per_million, people_vaccinated_per_hundred, confirmados,
+         fallecidos,tiempo_una_vacuna, ritmo_semanal_una) %>% 
   filter(!is.na(tiempo_una_vacuna)) %>% 
   filter(!is.infinite(tiempo_una_vacuna)) %>% 
   filter(!is.na(ritmo_semanal_una)) %>% 
@@ -227,10 +178,13 @@ temp %>%
   mutate(tiempo_una_vacuna = round(tiempo_una_vacuna, 0), 
          people_vaccinated_per_hundred = round(people_vaccinated_per_hundred, 2)) -> temp
 
+
 temp %>% 
   select(date, nombre_espanol, everything()) -> temp
+
 temp$nombre_espanol %<>% gsub("Reino Unido de Gran Bretaña e Irlanda del Norte", "Reino Unido", .)
 temp$nombre_espanol %<>% gsub("Estados Unidos de América", "Estados Unidos", .)
+temp$nombre_espanol %<>% gsub("Bolivia \\(Estado Plurinacional de\\)", "Bolivia", .)
 
 
 Sys.setlocale(locale = "es_ES.UTF-8")
@@ -243,18 +197,14 @@ temp %>%
   ) %>% 
   filter(!is.na(nombre_espanol)) -> temp
 
-
-temp %<>% filter(nombre_espanol != "Emiratos Árabes Unidos")
-
-
-# nombres al portugués
-nombres <- rio::import("input/nombres.csv")
+nombres <- rio::import("input/nombres.csv", sep = ";")
 
 temp %<>% merge(., nombres, all.x = T)
 temp %<>%
   select(-nombre_espanol) %>% 
   rename(nombre_espanol = nombres_pt) %>% 
-  select(nombre_espanol, everything())
+  select(date, nombre_espanol, everything()) %>% 
+  filter(!is.na(nombre_espanol))
 
 
 
