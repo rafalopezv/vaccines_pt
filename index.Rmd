@@ -17,6 +17,7 @@ library(htmlwidgets)
 library(magrittr)
 
 source("code/limpieza_1.R")
+options(scipen = 999)
 ```
 
 <br>
@@ -99,6 +100,10 @@ reactable(
     showSortIcon = FALSE,
     highlight = TRUE,
     compact = TRUE,
+    searchable = TRUE,
+    language = reactableLang(
+      searchPlaceholder = "País de pesquisa"
+    ),
     defaultSorted = "people_vaccinated_per_hundred",
     defaultSortOrder = "desc",
     defaultColDef = colDef(headerClass = "header colheader"),

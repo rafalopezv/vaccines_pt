@@ -5,7 +5,7 @@
 library(tidyverse)
 library(magrittr)
 library(janitor)
-
+options(scipen = 999)
 # ---------------------
 # importar bases
 # ---------------------
