@@ -5,11 +5,12 @@
 library(tidyverse)
 library(magrittr)
 library(janitor)
-options(scipen = 999)
+
 # ---------------------
 # importar bases
 # ---------------------
 
+options(scipen = 999)
 
 metricas <- read_csv("https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/vaccinations/vaccinations.csv")
 
@@ -19,21 +20,10 @@ metricas %>%
     !is.na(people_vaccinated_per_hundred)
   ) %>% 
   select(location, iso_code, date, people_vaccinated_per_hundred, 
-         daily_vaccinations_per_million) %>% 
+         people_fully_vaccinated_per_hundred, total_boosters_per_hundred) %>%
   group_split(location) %>% 
-  map(., ~arrange(., desc(., date)) %>% 
-        slice(1:7) %>% 
-        mutate(
-          ritmo_semanal_una = daily_vaccinations_per_million/10000,
-          ritmo_semanal_una = mean(ritmo_semanal_una, na.rm = T)*7
-        ) %>% 
-        slice(1)) %>% 
-  bind_rows() %>% 
-  mutate(
-    tiempo_una_vacuna = (100-people_vaccinated_per_hundred)/ritmo_semanal_una
-  ) %>% 
-  select(date, location, everything()) -> metricas
-
+  map(., ~arrange(., desc(., date))) %>% 
+  bind_rows() -> metricas
 
 countrycode::codelist %>%
   select(iso_code = iso3c, nombre_espanol = un.name.es) %>% 
@@ -51,7 +41,10 @@ countrycode::codelist %>%
       location == "Gibraltar" ~ "Gibraltar", 
       T  ~ nombre_espanol
     ) 
-  ) -> temp
+  ) %>% 
+  group_split(location) %>% 
+  map(., ~arrange(., desc(date)) %>% slice(1)) %>% 
+  bind_rows() -> temp
 
 
 
@@ -68,6 +61,13 @@ rm(df_m, url, url_m)
 df %<>% rename(location = `Country/Region`)
 temp$location[!temp$location %in% (df$location %>% unique)]
 df$location %<>% gsub("US", "United States", .) 
+df$location %<>% gsub("Korea\\, South", "South Korea", .) 
+df$location %<>% gsub("Cabo Verde", "Cape Verde", .) 
+df$location %<>% gsub("Timor-Leste", "Timor", .) 
+df$location %<>% gsub("Burma", "Myanmar", .) 
+df$location %<>% gsub("Congo \\(Brazzaville\\)", "Congo", .) 
+df$location %<>% gsub("Congo \\(Kinshasa\\)", "Democratic Republic of Congo", .) 
+
 temp$location[!temp$location %in% (df$location %>% unique)]
 
 df %<>% 
@@ -167,17 +167,9 @@ rm(df)
 
 # últimos arreglos 
 temp %>% 
-  select(-iso_code, -location, -daily_vaccinations_per_million, people_vaccinated_per_hundred, confirmados,
-         fallecidos,tiempo_una_vacuna, ritmo_semanal_una) %>% 
-  filter(!is.na(tiempo_una_vacuna)) %>% 
-  filter(!is.infinite(tiempo_una_vacuna)) %>% 
-  filter(!is.na(ritmo_semanal_una)) %>% 
-  filter(!is.infinite(ritmo_semanal_una)) %>% 
-  select(-contains("_dos")) %>% 
+  select(-iso_code, -location) %>% 
   filter(!nombre_espanol %in% c("Inglaterra", "Wales", "Irlanda del Norte", "Isla de Man", "Gibraltar", "Escocia")) %>%
-  mutate(tiempo_una_vacuna = round(tiempo_una_vacuna, 0), 
-         people_vaccinated_per_hundred = round(people_vaccinated_per_hundred, 2)) -> temp
-
+  mutate_if(is.numeric, round, 2) -> temp
 
 temp %>% 
   select(date, nombre_espanol, everything()) -> temp
@@ -185,26 +177,43 @@ temp %>%
 temp$nombre_espanol %<>% gsub("Reino Unido de Gran Bretaña e Irlanda del Norte", "Reino Unido", .)
 temp$nombre_espanol %<>% gsub("Estados Unidos de América", "Estados Unidos", .)
 temp$nombre_espanol %<>% gsub("Bolivia \\(Estado Plurinacional de\\)", "Bolivia", .)
+temp$nombre_espanol %<>% gsub("Venezuela \\(República Bolivariana de\\)", "Venezuela", .)
+temp$nombre_espanol %<>% gsub("República Democrática Popular Lao", "Laos", .)
+temp$nombre_espanol %<>% gsub("Irán \\(República Islámica del\\)", "Irán", .)
+temp$nombre_espanol %<>% gsub("República Unida de Tanzanía", "Tanzanía", .)
+temp$nombre_espanol %<>% gsub("Gambia \\(República de\\)", "Gambia", .)
+temp$nombre_espanol %<>% gsub("República Árabe Siria", "Siria", .)
+temp$nombre_espanol %<>% gsub("República de Moldova", "Moldova", .)
+temp$nombre_espanol %<>% gsub("Federación de Rusia", "Rusia", .)
+temp$nombre_espanol %<>% gsub("República de Corea", "Corea del Sur", .)
 
-
-Sys.setlocale(locale = "es_ES.UTF-8")
-
+Sys.setlocale(locale = "pt_PT.UTF-8")
 
 temp %>% 
-  select(1:3, 5, 4, 6:7) %>% 
   mutate(
-    date =  format(date, "%d de %B")  
+    date =  format(date, "%d de %B"), 
+    total_boosters_per_hundred = case_when(
+      is.na(total_boosters_per_hundred) ~ 0, 
+      T ~ total_boosters_per_hundred
+    ), 
+    people_fully_vaccinated_per_hundred = case_when(
+      is.na(people_fully_vaccinated_per_hundred) ~ 0, 
+      T ~ people_fully_vaccinated_per_hundred
+    )
   ) %>% 
   filter(!is.na(nombre_espanol)) -> temp
 
+# importar nombres en portugues
 nombres <- rio::import("input/nombres.csv", sep = ";")
 
-temp %<>% merge(., nombres, all.x = T)
+temp %<>% merge(., nombres, all.x = T) 
+
 temp %<>%
   select(-nombre_espanol) %>% 
   rename(nombre_espanol = nombres_pt) %>% 
   select(date, nombre_espanol, everything()) %>% 
   filter(!is.na(nombre_espanol))
+
 
 
 
