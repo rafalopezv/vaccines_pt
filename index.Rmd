@@ -99,14 +99,14 @@ reactable(
                            align = "center",
                            cell = function(values) {
     sparkline(values, type = "line", chartRangeMin = 0, height = "80%", width = "70%",
-              fillColor = "#E1E1E1", lineColor = "#073B4C", lineWidth = 3)
+              fillColor = "#E1E1E1", lineColor = "#073B4C", lineWidth = 1.5)
   }),
   fallecidos = colDef(class = "sparkys",
                       name = "Óbitos",
                       align = "center",
                       cell = function(values) {
     sparkline(values, type = "line", chartRangeMin = 0, height = "75%", width = "60%",
-              fillColor = "#E1E1E1", lineColor = "#073B4C", lineWidth = 3)
+              fillColor = "#E1E1E1", lineColor = "#073B4C", lineWidth = 1.5)
   }),
       
     people_vaccinated_per_hundred = colDef(
